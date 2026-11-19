@@ -4,7 +4,9 @@ import time
 import requests
 import streamlit as st
 
-API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/") + "/section-1"
+st.set_page_config(page_title="Session 1 · 시큐어 코딩", layout="wide")
+
+API_URL = os.getenv("API_URL", "http://localhost:8002").rstrip("/") + "/section-1"
 
 
 def show_response(response, *, as_html_source=False):

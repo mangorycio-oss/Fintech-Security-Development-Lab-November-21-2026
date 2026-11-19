@@ -33,9 +33,8 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(headers["X-Frame-Options"], "DENY")
         self.assertNotEqual(headers["X-Request-ID"], request_id)
 
-        status, headers = self.request("GET", "/section-1/csrf/token")
-        self.assertEqual(status, 200)
-        self.assertEqual(headers["Cache-Control"], "no-store")
+        status, _ = self.request("GET", "/section-1/csrf/token")
+        self.assertEqual(status, 404)
 
     def test_rejects_unknown_routes_and_methods(self):
         self.assertEqual(self.request("GET", "/section-2/unknown")[0], 404)

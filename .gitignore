@@ -19,3 +19,5 @@ __pycache__/
 # Local architecture images
 /architecture*.png
 /architecture*.svg
+
+session3/reports/

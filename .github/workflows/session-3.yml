@@ -29,70 +29,35 @@ jobs:
         run: python -m pip install bandit==1.9.4 pip-audit==2.10.1
 
       - name: Scan Python source
-        run: bandit -r web bank shared frontend --exit-zero
+        run: session3/check.sh source
 
       - name: Audit Python dependencies
-        run: |
-          for requirements in requirements-api.txt frontend/requirements.txt; do
-            echo "Auditing $requirements"
-            report=$(mktemp)
-            status=0
-            pip-audit -r "$requirements" --format json --desc off --output "$report" || status=$?
-            jq . "$report"
-            if [[ "$status" == 1 ]] && jq -e 'any(.dependencies[]; .vulns | length > 0)' "$report" >/dev/null; then
-              echo "::warning::Known vulnerabilities in $requirements. Review the report above."
-            elif [[ "$status" != 0 ]]; then
-              exit "$status"
-            fi
-          done
+        run: session3/check.sh dependencies
 
-      - name: Build or pull Compose images
-        run: |
-          docker compose build
-          docker compose pull gateway
+      - name: Build or pull Session 2 images
+        run: session3/check.sh build
 
       - name: Scan Compose images
-        run: |
-          scan_dir=$(mktemp -d)
-          images=$(docker compose config --images)
-          for image in $images; do
-            echo "Scanning $image"
-            docker save -o "$scan_dir/image.tar" "$image"
-            docker run --rm --mount "type=bind,source=$scan_dir,target=/scan" \
-              ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 image --cache-dir /scan/cache \
-              --scanners vuln --no-progress --exit-code 0 --input /scan/image.tar
-          done
+        run: session3/check.sh images
 
       - name: Start Compose
         id: compose
-        run: docker compose up --no-build -d --wait --wait-timeout 120
+        run: session3/check.sh start
 
       - name: Observe normal Gateway traffic with ZAP
-        run: |
-          mkdir -p "$RUNNER_TEMP/zap"
-          chmod a+w "$RUNNER_TEMP/zap"
-          docker run --rm --network "${COMPOSE_PROJECT_NAME}_default" \
-            -v "$PWD/.github/zap-passive.yml:/zap/plan.yml:ro" \
-            -v "$RUNNER_TEMP/zap:/zap/reports" \
-            ghcr.io/zaproxy/zaproxy:stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af zap.sh -cmd -autorun /zap/plan.yml
-          test -s "$RUNNER_TEMP/zap/zap-passive.html"
+        run: session3/check.sh passive
 
       - name: Run unittest including Gateway checks
         if: ${{ !cancelled() && steps.compose.outcome == 'success' }}
-        run: |
-          docker compose run --rm --no-deps \
-            -e PYTHONDONTWRITEBYTECODE=1 \
-            -e TEST_GATEWAY_URL=http://gateway:8000 \
-            -v "$PWD:/workspace:ro" \
-            api python -m unittest discover -v
+        run: session3/check.sh test
 
       - name: Capture Compose logs on failure
         if: failure()
-        run: docker compose logs --no-color
+        run: session3/check.sh logs
 
       - name: Stop Compose
         if: always()
-        run: docker compose down --volumes --remove-orphans
+        run: session3/check.sh stop
 
       - name: Upload passive DAST report
         if: ${{ !cancelled() }}

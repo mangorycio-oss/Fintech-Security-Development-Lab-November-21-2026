@@ -4,7 +4,7 @@
 
 ## 실행
 
-프로젝트 루트에서 실행합니다.
+저장소에서 `cd session2`로 이동한 뒤 실행합니다.
 
 ```bash
 docker compose up --build -d
@@ -26,24 +26,24 @@ docker compose up --build -d
 
 ## 백엔드 폴더
 
-- [web/](.) · 웹 API. `main.py`에서 세션 2 라우터와 세션 1 실습을 등록합니다.
-- [bank/](../bank/) · 은행 API. `main.py`에서 은행 라우터를 등록하고 `database.py`에서 은행 DB를 준비합니다. `routers/`는 HTTP 요청을 받고 `services.py`는 결제를 처리합니다.
-- [shared/](../shared/) · 양쪽에서 쓰는 OAuth 요청 규칙, 결제 요청 모델, 일회용 값과 DB 도구.
+- [web/](web/) · 웹 API. `main.py`에서 인증·은행 연결·결제·패스키 라우터를 등록합니다.
+- [bank/](bank/) · 은행 API. `main.py`에서 은행 라우터를 등록하고 `database.py`에서 은행 DB를 준비합니다. `routers/`는 HTTP 요청을 받고 `services.py`는 결제를 처리합니다.
+- [shared/](shared/) · 양쪽에서 쓰는 OAuth 요청 규칙, 결제 요청 모델, 일회용 값과 DB 도구.
 
 ## 코드 위치
 
 | 위치 | 역할 |
 | --- | --- |
-| [routers/auth.py](routers/auth.py) | 가입, 비밀번호 검증, TOTP 챌린지, JWT 발급 |
-| [routers/oauth.py](routers/oauth.py) | 연결 시작, 콜백 검증, 은행 토큰 저장과 계좌 조회 중개 |
-| [bank/routers/oauth.py](../bank/routers/oauth.py) · [bank/routers/resources.py](../bank/routers/resources.py) | 은행 동의·코드 교환과 계좌·결제 |
-| [routers/payments.py](routers/payments.py) | 결제 요청, 요청량 제한, 소유권 확인, 영수증 조회 |
-| [routers/webauthn.py](routers/webauthn.py) · [webauthn.html](routers/webauthn.html) | 브라우저 패스키 등록, 결제별 챌린지와 공개키 서명 검증 |
-| [security/](security/) | 비밀번호 해시, JWT, TOTP, 요청량 제한, 영수증 암호화 |
-| [services/](services/) | 웹 API에서 은행 호출, 결제 상태와 영수증 처리 |
-| [models.py](models.py) · [database.py](database.py) | 요청 모델, 일회용 챌린지, SQLite 스키마와 트랜잭션 |
-| [frontend/section2.py](../frontend/section2.py) | Streamlit 실습 화면 |
-| [tests/section2/](../tests/section2/) | 인증, 만료되거나 서명이 잘못된 JWT, PKCE와 동의 범위, 결제 승인, 암호화 검증 |
+| [routers/auth.py](web/routers/auth.py) | 가입, 비밀번호 검증, TOTP 챌린지, JWT 발급 |
+| [routers/oauth.py](web/routers/oauth.py) | 연결 시작, 콜백 검증, 은행 토큰 저장과 계좌 조회 중개 |
+| [bank/routers/oauth.py](bank/routers/oauth.py) · [bank/routers/resources.py](bank/routers/resources.py) | 은행 동의·코드 교환과 계좌·결제 |
+| [routers/payments.py](web/routers/payments.py) | 결제 요청, 요청량 제한, 소유권 확인, 영수증 조회 |
+| [routers/webauthn.py](web/routers/webauthn.py) · [webauthn.html](web/routers/webauthn.html) | 브라우저 패스키 등록, 결제별 챌린지와 공개키 서명 검증 |
+| [security/](web/security/) | 비밀번호 해시, JWT, TOTP, 요청량 제한, 영수증 암호화 |
+| [services/](web/services/) | 웹 API에서 은행 호출, 결제 상태와 영수증 처리 |
+| [models.py](web/models.py) · [database.py](web/database.py) | 요청 모델, 일회용 챌린지, SQLite 스키마와 트랜잭션 |
+| [frontend/section2.py](frontend/section2.py) | Streamlit 실습 화면 |
+| [tests/section2/](tests/section2/) | 인증, 만료되거나 서명이 잘못된 JWT, PKCE와 동의 범위, 결제 승인, 암호화 검증 |
 
 ## 암호 기술이 쓰이는 위치
 
