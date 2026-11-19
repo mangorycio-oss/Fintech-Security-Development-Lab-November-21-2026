@@ -1,0 +1,29 @@
+env:
+  contexts:
+    - name: Gateway
+      urls:
+        - http://gateway:8000
+  parameters:
+    failOnError: true
+    failOnWarning: false
+
+jobs:
+  - type: passiveScan-config
+    parameters:
+      scanOnlyInScope: true
+  - type: requestor
+    requests:
+      - url: http://gateway:8000/
+        method: GET
+        responseCode: 200
+      - url: http://gateway:8000/section-2/webauthn/browser
+        method: GET
+        responseCode: 200
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 2
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/reports
+      reportFile: zap-passive.html
