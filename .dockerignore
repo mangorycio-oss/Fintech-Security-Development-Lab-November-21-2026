@@ -1,0 +1,10 @@
+**
+!requirements-api.txt
+!web/
+!web/**/*.py
+!web/**/*.html
+!bank/
+!bank/**/*.py
+!shared/
+!shared/**/*.py
+**/__pycache__

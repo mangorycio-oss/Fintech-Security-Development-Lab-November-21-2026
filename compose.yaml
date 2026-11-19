@@ -1,0 +1,71 @@
+services:
+  api:
+    depends_on:
+      bank:
+        condition: service_healthy
+    volumes:
+      - bank_identity:/run/bank-identity:ro
+      - web_socket:/run/web-api
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      target: web
+    environment:
+      BANK_API_URL: http://bank:8001
+      BANK_BROWSER_URL: "${BANK_BROWSER_URL:-http://localhost:8001}"
+      FRONTEND_BROWSER_URL: "${FRONTEND_BROWSER_URL:-http://localhost:8501}"
+      OAUTH_REDIRECT_URI: "${OAUTH_REDIRECT_URI:-http://localhost:8000/section-2/bank/callback}"
+      CSRF_TRUSTED_ORIGIN: "${CSRF_TRUSTED_ORIGIN:-http://localhost:8000}"
+      WEBAUTHN_ORIGIN: "${WEBAUTHN_ORIGIN:-http://localhost:8000}"
+    command: ["uvicorn", "web.main:app", "--uds", "/run/web-api/api.sock", "--forwarded-allow-ips", "*", "--no-access-log"]
+  gateway:
+    image: nginx:1.28-alpine
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./gateway/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - web_socket:/run/web-api:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  frontend:
+    build: ./frontend
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      API_URL: http://gateway:8000
+      BROWSER_API_URL: "${WEBAUTHN_ORIGIN:-http://localhost:8000}"
+      CSRF_TRUSTED_ORIGIN: "${CSRF_TRUSTED_ORIGIN:-http://localhost:8000}"
+    ports:
+      - "127.0.0.1:8501:8501"
+    volumes:
+      - ./frontend:/workspace:ro
+  bank:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      target: bank
+    command: ["uvicorn", "bank.main:app", "--host", "0.0.0.0", "--port", "8001", "--no-access-log"]
+    environment:
+      BANK_DATABASE: /var/lib/bank/bank.sqlite3
+      OAUTH_REDIRECT_URI: "${OAUTH_REDIRECT_URI:-http://localhost:8000/section-2/bank/callback}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8001/openapi.json', timeout=2).close()"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - bank_identity:/run/bank-identity
+      - bank_data:/var/lib/bank
+
+volumes:
+  bank_identity:
+  bank_data:
+  web_socket:

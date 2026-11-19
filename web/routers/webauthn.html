@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fintech Lab · 패스키</title>
+<style>
+  body{font:1rem/1.6 system-ui,sans-serif;max-width:38rem;margin:3rem auto;padding:0 1rem;color:#172138}
+  label,input{display:block;width:100%;box-sizing:border-box} input,button{font:inherit;padding:.45rem;margin:.3rem 0 1rem}
+  output{display:block;padding:1rem;background:#f0f3f8;white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+<h1>패스키 등록 및 결제 승인</h1>
+<p>Streamlit Section 2에서 발급된 실습용 JWT와 결제 ID를 입력하세요.</p>
+<label>실습용 JWT<input id="token" type="password" autocomplete="off"></label>
+<button id="register">패스키 등록</button>
+<label>결제 ID<input id="payment" autocomplete="off"></label>
+<button id="approve">패스키로 결제 승인</button>
+<output id="result" aria-live="polite"></output>
+<script>
+const token = document.getElementById("token");
+const result = document.getElementById("result");
+const buttons = document.querySelectorAll("button");
+const prefix = "/section-2/webauthn";
+
+async function post(path, body) {
+  const response = await fetch(prefix + path, {
+    method: "POST",
+    headers: {"Authorization": "Bearer " + token.value.trim(), "Content-Type": "application/json"},
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "요청을 확인해 주세요.");
+  return data;
+}
+
+function decode(text) {
+  return Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text.length / 4) * 4, "=")), ch => ch.charCodeAt(0));
+}
+function encode(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function serialize(credential) {
+  const response = {};
+  for (const key of ["clientDataJSON","attestationObject","authenticatorData","signature","userHandle"]) {
+    if (credential.response[key]) response[key] = encode(credential.response[key]);
+  }
+  return {id: credential.id, rawId: encode(credential.rawId), type: credential.type, response};
+}
+async function ceremony(register) {
+  for (const button of buttons) button.disabled = true;
+  result.textContent = "인증기 응답을 기다리는 중입니다.";
+  try {
+    if (!window.PublicKeyCredential) throw new Error("localhost 또는 HTTPS에서 패스키를 지원하는 브라우저로 열어 주세요.");
+    const id = encodeURIComponent(document.getElementById("payment").value.trim());
+    const optionsPath = register ? "/register/options" : "/approve/" + id + "/options";
+    const {challenge_id, publicKey, payment} = await post(optionsPath, {});
+    if (payment && !window.confirm(`${payment.amount_krw.toLocaleString("ko-KR")}원 결제를 승인하시겠습니까?`)) {
+      result.textContent = "결제 승인을 취소했습니다.";
+      return;
+    }
+    publicKey.challenge = decode(publicKey.challenge);
+    if (register) publicKey.user.id = decode(publicKey.user.id);
+    for (const key of ["allowCredentials", "excludeCredentials"]) {
+      for (const descriptor of publicKey[key] || []) descriptor.id = decode(descriptor.id);
+    }
+    const credential = register
+      ? await navigator.credentials.create({publicKey})
+      : await navigator.credentials.get({publicKey});
+    const body = {challenge_id, credential: serialize(credential)};
+    const response = await post(register ? "/register/verify" : "/approve/verify", body);
+    result.textContent = register ? "패스키를 등록했습니다." : "서명 검증 완료.\n" + JSON.stringify(response, null, 2);
+  } catch (error) {
+    result.textContent = error.message;
+  } finally {
+    for (const button of buttons) button.disabled = false;
+  }
+}
+document.getElementById("register").addEventListener("click", () => ceremony(true));
+document.getElementById("approve").addEventListener("click", () => ceremony(false));
+</script>
+</html>

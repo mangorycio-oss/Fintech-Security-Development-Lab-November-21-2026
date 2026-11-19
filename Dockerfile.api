@@ -1,0 +1,13 @@
+FROM python:3.12-slim AS base
+WORKDIR /workspace
+COPY requirements-api.txt .
+RUN pip install --no-cache-dir -r requirements-api.txt
+COPY shared ./shared
+
+FROM base AS bank
+COPY bank ./bank
+CMD ["uvicorn", "bank.main:app", "--host", "0.0.0.0", "--port", "8001"]
+
+FROM base AS web
+COPY web ./web
+CMD ["uvicorn", "web.main:app", "--host", "0.0.0.0", "--port", "8000"]
