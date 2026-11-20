@@ -68,7 +68,7 @@ case "${1:-}" in
         session2/web session2/bank session2/shared session2/frontend --exit-zero ;;
     source-high) run_python_scanner bandit -r session2/web session2/bank session2/shared session2/frontend --severity-level high ;;
     dependencies) run_python_scanner bash session3/audit-dependencies.sh ;;
-    build) compose build; compose pull gateway ;;
+    build) compose build ;;
     images) scan_images ;;
     start) compose up --no-build -d --wait --wait-timeout 120 ;;
     passive) passive_scan ;;
