@@ -18,24 +18,12 @@ compose() {
     docker compose --project-directory "$session2_dir" "$@"
 }
 
-audit_dependencies() {
-    for requirements in session1/requirements-api.txt session1/frontend/requirements.txt \
-                        session2/requirements-api.txt session2/frontend/requirements.txt; do
-        echo "Auditing $requirements"
-        report=$(mktemp)
-        status=0
-        pip-audit -r "$repo_dir/$requirements" --format json --desc off --output "$report" || status=$?
-        if [[ "$status" == 1 ]] && jq -e 'any(.dependencies[]; .vulns | length > 0)' "$report" >/dev/null; then
-            jq . "$report"
-            echo "::warning::Known vulnerabilities in $requirements. Review the report above."
-        elif [[ "$status" != 0 ]]; then
-            rm -- "$report"
-            return "$status"
-        else
-            jq . "$report"
-        fi
-        rm -- "$report"
-    done
+run_python_scanner() {
+    local image
+    image=$(docker build --quiet - < "$session_dir/Dockerfile.scanners")
+    docker run --rm \
+        --mount "type=bind,source=$repo_dir,target=/workspace,readonly" \
+        "$image" "$@"
 }
 
 scan_images() (
@@ -76,10 +64,10 @@ passive_scan() {
 }
 
 case "${1:-}" in
-    source) cd "$repo_dir"; bandit -r session1/main.py session1/routers session1/frontend \
+    source) run_python_scanner bandit -r session1/main.py session1/routers session1/frontend \
         session2/web session2/bank session2/shared session2/frontend --exit-zero ;;
-    source-high) cd "$session2_dir"; bandit -r web bank shared frontend --severity-level high ;;
-    dependencies) audit_dependencies ;;
+    source-high) run_python_scanner bandit -r session2/web session2/bank session2/shared session2/frontend --severity-level high ;;
+    dependencies) run_python_scanner bash session3/audit-dependencies.sh ;;
     build) compose build; compose pull gateway ;;
     images) scan_images ;;
     start) compose up --no-build -d --wait --wait-timeout 120 ;;
