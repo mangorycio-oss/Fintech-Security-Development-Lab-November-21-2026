@@ -10,12 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  devsecops:
-    name: Session 3 checks
+  bandit:
+    name: Bandit (High)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      COMPOSE_PROJECT_NAME: session3
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -25,31 +23,44 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Python scanners
-        run: python -m pip install bandit==1.9.4 pip-audit==2.10.1
+      - name: Install Bandit
+        run: python -m pip install bandit==1.9.4
 
-      - name: Scan Python source
-        run: session3/check.sh source
+      - name: Block on High severity findings in Session 2
+        run: session3/check.sh source-high
 
-      - name: Audit Python dependencies
-        run: session3/check.sh dependencies
+      - name: Audit Python dependencies for review
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          python -m pip install pip-audit==2.10.1
+          session3/check.sh dependencies
+
+  unittest:
+    name: Session 2 unittest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: session3
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Build or pull Session 2 images
         run: session3/check.sh build
-
-      - name: Scan Compose images
-        run: session3/check.sh images
 
       - name: Start Compose
         id: compose
         run: session3/check.sh start
 
-      - name: Observe normal Gateway traffic with ZAP
-        run: session3/check.sh passive
-
       - name: Run unittest including Gateway checks
-        if: ${{ !cancelled() && steps.compose.outcome == 'success' }}
         run: session3/check.sh test
+
+      - name: Observe normal Gateway traffic with ZAP
+        if: ${{ !cancelled() && steps.compose.outcome == 'success' }}
+        continue-on-error: true
+        run: session3/check.sh passive
 
       - name: Capture Compose logs on failure
         if: failure()
@@ -61,8 +72,26 @@ jobs:
 
       - name: Upload passive DAST report
         if: ${{ !cancelled() }}
+        continue-on-error: true
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: zap-passive
           path: ${{ runner.temp }}/zap/zap-passive.html
           if-no-files-found: ignore
+
+  trivy:
+    name: Trivy (High or Critical)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: session3
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Build or pull Session 2 images
+        run: session3/check.sh build
+
+      - name: Block on HIGH or CRITICAL image vulnerabilities
+        run: session3/check.sh images

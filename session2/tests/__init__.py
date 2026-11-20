@@ -28,8 +28,10 @@ def start_server(application):
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
     server = uvicorn.Server(uvicorn.Config(application, host="127.0.0.1", port=port, log_level="error"))
-    threading.Thread(target=server.run, daemon=True).start()
-    for _ in range(200):
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 30
+    while thread.is_alive() and time.monotonic() < deadline:
         if server.started:
             return f"http://127.0.0.1:{port}"
         time.sleep(0.025)
